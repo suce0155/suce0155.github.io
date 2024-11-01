@@ -446,7 +446,7 @@ Trying the same password used on `james`, logs in.
 
 `ChangeDetection.io` has a Remote Code Execution (RCE) on `V0.45` when malicious ssti payload is injected into notification body section. When there is a change on the site we entered, the injected payload is executed on application.
 
-Using [**this**](https://ayoubmokhtar.com/post/png_driven_chain_xss_to_remote_code_execution_prestashop_8.1.5_cve-2024-34716/) payload on `exploit.db` and changing it a bit, gets a connection back.
+Using [**this**](https://www.exploit-db.com/exploits/52027) payload on `exploit.db` and changing it a bit, gets a connection back. Don't forget the server doesn't have internet connection. Use localhost for payload. 
 
 Root password can be found on `history` tab. `su root` on `james` ssh shell with the password. Machine pwned!
 
