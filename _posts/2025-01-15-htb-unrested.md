@@ -179,4 +179,4 @@ id
 uid=0(root) gid=0(root) groups=0(root)
 ```
 
-Root flag can be found in `/root/root.txt`
+Root flag can be found in `/root/root.txt`.
