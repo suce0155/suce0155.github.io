@@ -12,7 +12,7 @@ image:
 
 ## Introduction
 Every sysadmin is familiar with Veeam's enterprise backup solution, Veeam Backup & Replication. Unfortunately, so is attackers.
-Today, we're going to look at the latest vulnerability - CVE-2026-44963. This vulnerability was reported by Sina Kheirkhah [**@SinSinology**](https://x.com/SinSinology) of [**WatchTowr**](https://watchtowr.com/). Veeam advisory tells us that it affects version 12.3.2.4465 below and full patched at 12.3.2.4854. 
+Today, we're going to look at the latest vulnerability - CVE-2026-44963. This vulnerability was reported by Sina Kheirkhah [**@SinSinology**](https://x.com/SinSinology) of [**WatchTowr**](https://watchtowr.com/). Veeam advisory tells us that it affects version 12.3.2.4465 and below also fully patched at 12.3.2.4854. 
 WatchTowr has already published 2 blog posts about previous RCEs, [**CVE-2024-40711**](https://labs.watchtowr.com/veeam-backup-response-rce-with-auth-but-mostly-without-auth-cve-2024-40711-2/) and [**CVE-2025-23120**](https://labs.watchtowr.com/by-executive-order-we-are-banning-blacklists-domain-level-rce-in-veeam-backup-replication-cve-2025-23120/) which been a big help for
 understanding the .NET Remoting internals and .NET deserialization. Don't forget to check them out.
 
