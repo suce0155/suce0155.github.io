@@ -1,9 +1,9 @@
 ---
 title: CVE_2026_44963 Veeam RCE
-description: CVE_2026_44963 Veeam Backup and Replication Authenticated RCE
+description: Veeam Remote Code Execution (RCE) on the Backup Server by an authenticated domain user.
 date: 2026-07-2 11:33:00 +0800
 categories: [cve]
-tags: [.NET, deserilization, rce]
+tags: [.NET, deserilization, rce, veeam]
 math: true
 mermaid: true
 image:
@@ -290,8 +290,8 @@ To mitigate exploitation of these vulnerabilities :
     Don't join your production domain with Veeam Backup & Replication server. Either use a Workgroup or a Seperate Management Domain.
     Set up MFA (Multi Factor Authentication)
 
-Speaking of exploitation, here is the full POC, opening a `notepad.exe` under `Veeam Mount Service (NT Authority/SYSTEM)` from a
-remote host.
+Speaking of exploitation, here is the full [**POC**](https://github.com/suce0155/CVE_2026_44963), opening a `notepad.exe` under `Veeam Mount Service (NT Authority/SYSTEM)` from a
+remote host. 
 
 
 <iframe width="840" height="473" src="/assets/video/poc1.mp4" title="YouTube video player" frameborder="0" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
