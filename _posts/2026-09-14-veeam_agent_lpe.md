@@ -233,4 +233,5 @@ Here is the [**POC**](https://github.com/suce0155/CVE-2026-32996), printing whoa
 
 Keep in mind, a active and valid session UID is required for this to work.
 
+
 <iframe width="840" height="473" src="/assets/video/poc3.mp4" title="YouTube video player" frameborder="0" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
