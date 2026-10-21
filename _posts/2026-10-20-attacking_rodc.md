@@ -1,13 +1,10 @@
 ---
 title: Attacking Read-Only Domain Controllers (RODCs) to Compromise Active Directory Domains
-description: Attacking RODC
 date: 2026-10-20 11:33:00 +0800
 categories: [windows]
 tags: [active directory, kerberos, windows, privilege escalation,]
 math: true
 mermaid: true
-image:
-  path: /assets/img/research/cve_2026_32996/0.png
 ---
 
 Welcome back to another Windows Security blog post.
